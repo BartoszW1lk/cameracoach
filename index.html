@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-fullscreen">
+  <meta name="apple-mobile-web-app-title" content="CameraCoach">
+  <title>CameraCoach</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ===== PERMISSION SCREEN ===== */
+    #perm-screen {
+      position: fixed;
+      inset: 0;
+      background: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      text-align: center;
+      padding: 36px;
+      z-index: 200;
+    }
+    #perm-screen .logo { font-size: 72px; }
+    #perm-screen h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+    #perm-screen p { font-size: 15px; opacity: 0.65; line-height: 1.6; max-width: 300px; }
+    #perm-screen ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+      background: rgba(255,255,255,0.06);
+      padding: 16px 20px;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 300px;
+    }
+    #perm-screen ul li { font-size: 14px; opacity: 0.8; }
+    #perm-screen ul li span { margin-right: 8px; }
+    #start-btn {
+      padding: 15px 40px;
+      border-radius: 30px;
+      border: none;
+      background: #fff;
+      color: #000;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 100%;
+      max-width: 280px;
+      transition: opacity 0.15s;
+    }
+    #start-btn:active { opacity: 0.7; }
+
+    /* ===== MAIN CONTAINER ===== */
+    #app {
+      position: fixed;
+      inset: 0;
+      display: none;
+    }
+
+    #video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #capture-canvas { display: none; }
+
+    /* ===== OVERLAYS ===== */
+
+    /* Grid 3x3 */
+    #grid-overlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      pointer-events: none;
+    }
+    .gl-h, .gl-v {
+      position: absolute;
+      background: rgba(255,255,255,0.35);
+    }
+    .gl-h { left: 0; right: 0; height: 1px; }
+    .gl-v { top: 0; bottom: 0; width: 1px; }
+    #gh1 { top: 33.33%; }
+    #gh2 { top: 66.66%; }
+    #gv1 { left: 33.33%; }
+    #gv2 { left: 66.66%; }
+    .grid-dot {
+      position: absolute;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255,220,80,0.8);
+      background: transparent;
+      transform: translate(-50%, -50%);
+    }
+
+    /* Horizon line */
+    #horizon-line {
+      position: absolute;
+      top: 50%;
+      left: 10%;
+      right: 10%;
+      height: 1px;
+      display: none;
+      pointer-events: none;
+      transform-origin: center center;
+    }
+    #horizon-line::before, #horizon-line::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      height: 1px;
+      width: 40%;
+      background: rgba(255,255,255,0.5);
+    }
+    #horizon-line::before { left: 0; }
+    #horizon-line::after  { right: 0; }
+    #horizon-center {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 20%;
+      height: 1px;
+      background: rgba(255,255,255,0.85);
+    }
+    #horizon-center.is-level { background: #4CAF50; }
+
+    /* Level bubble */
+    #level-bubble-wrap {
+      position: absolute;
+      bottom: 140px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      pointer-events: none;
+    }
+    #level-track {
+      width: 110px;
+      height: 22px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 11px;
+      position: relative;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    #level-bubble {
+      position: absolute;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: #fff;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      transition: left 0.08s linear, background 0.2s;
+    }
+    #level-bubble.ok { background: #4CAF50; }
+    #level-angle {
+      font-size: 11px;
+      opacity: 0.6;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Exposure meter */
+    #exp-meter {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      pointer-events: none;
+    }
+    #exp-bar-bg {
+      width: 10px;
+      height: 140px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 5px;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+    #exp-bar-fill {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      border-radius: 5px;
+      transition: height 0.35s ease, background-color 0.35s ease;
+    }
+    #exp-label { font-size: 9px; opacity: 0.55; letter-spacing: 0.5px; }
+    #exp-zone {
+      font-size: 9px;
+      opacity: 0.75;
+      text-align: center;
+      max-width: 36px;
+      line-height: 1.2;
+    }
+
+    /* Histogram */
+    #histogram {
+      position: absolute;
+      left: 14px;
+      bottom: 108px;
+      width: 88px;
+      height: 54px;
+      background: rgba(0,0,0,0.55);
+      border-radius: 8px;
+      overflow: hidden;
+      display: none;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    #hist-canvas { width: 100%; height: 100%; }
+
+    /* Tip banner */
+    #tip-banner {
+      position: absolute;
+      top: 72px;
+      left: 14px;
+      right: 14px;
+      background: rgba(0,0,0,0.62);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      border-radius: 14px;
+      padding: 10px 14px;
+      font-size: 13px;
+      line-height: 1.4;
+      display: none;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    #tip-icon { font-size: 16px; margin-right: 6px; }
+
+    /* Focus ring */
+    #focus-ring {
+      position: absolute;
+      width: 80px; height: 80px;
+      border: 2px solid rgba(255,255,255,0.9);
+      border-radius: 8px;
+      pointer-events: none;
+      display: none;
+      transform: translate(-50%, -50%);
+    }
+    #focus-ring.focused { border-color: #FFD700; }
+    @keyframes focus-pop {
+      0%   { transform: translate(-50%,-50%) scale(1.6); opacity: 0; }
+      60%  { transform: translate(-50%,-50%) scale(0.9); opacity: 1; }
+      100% { transform: translate(-50%,-50%) scale(1);   opacity: 1; }
+    }
+
+    /* Flash */
+    #flash {
+      position: absolute;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    /* Timer countdown */
+    #countdown {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 96px;
+      font-weight: 100;
+      color: #fff;
+      text-shadow: 0 4px 24px rgba(0,0,0,0.6);
+      display: none;
+      z-index: 60;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Zoom slider */
+    #zoom-wrap {
+      position: absolute;
+      bottom: 108px;
+      left: 14px;
+      right: 14px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: rgba(0,0,0,0.5);
+      border-radius: 20px;
+      padding: 6px 14px;
+    }
+    #zoom-label { font-size: 12px; min-width: 34px; text-align: right; opacity: 0.8; font-variant-numeric: tabular-nums; }
+    #zoom-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      background: rgba(255,255,255,0.25);
+      border-radius: 2px;
+      outline: none;
+    }
+    #zoom-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    /* ===== TOP BAR ===== */
+    #top-bar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      padding-top: max(14px, env(safe-area-inset-top));
+      padding-bottom: 12px;
+      padding-left: 14px;
+      padding-right: 14px;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.65) 0%, transparent 100%);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      z-index: 10;
+    }
+
+    /* ===== BOTTOM BAR ===== */
+    #bottom-bar {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding-bottom: max(18px, env(safe-area-inset-bottom));
+      padding-top: 14px;
+      padding-left: 14px;
+      padding-right: 14px;
+      background: linear-gradient(to top, rgba(0,0,0,0.72) 0%, transparent 100%);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 10;
+    }
+
+    /* ===== BUTTONS ===== */
+    .ibtn {
+      width: 46px; height: 46px;
+      border-radius: 50%;
+      border: none;
+      background: rgba(255,255,255,0.12);
+      color: #fff;
+      font-size: 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      transition: background 0.15s, transform 0.1s;
+      position: relative;
+    }
+    .ibtn:active { transform: scale(0.88); }
+    .ibtn.on { background: rgba(255,214,0,0.35); box-shadow: 0 0 0 1.5px rgba(255,214,0,0.5); }
+    .ibtn.disabled { opacity: 0.35; }
+
+    .ibtn-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+    .ibtn-lbl {
+      font-size: 10px;
+      opacity: 0.55;
+      line-height: 1;
+    }
+
+    /* Capture button */
+    #capture-btn {
+      width: 74px; height: 74px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.8);
+      background: rgba(255,255,255,0.15);
+      cursor: pointer;
+      position: relative;
+      transition: transform 0.1s;
+      backdrop-filter: blur(4px);
+    }
+    #capture-btn::after {
+      content: '';
+      position: absolute;
+      inset: 5px;
+      border-radius: 50%;
+      background: #fff;
+      transition: background 0.15s;
+    }
+    #capture-btn:active { transform: scale(0.9); }
+    #capture-btn.recording::after { background: #f44336; }
+
+    /* Toast */
+    #toast {
+      position: absolute;
+      bottom: 110px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20,20,20,0.85);
+      color: #fff;
+      padding: 8px 20px;
+      border-radius: 22px;
+      font-size: 13px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 80;
+      backdrop-filter: blur(4px);
+      transition: opacity 0.25s;
+    }
+  </style>
+</head>
+<body>
+
+<!-- PERMISSION SCREEN -->
+<div id="perm-screen">
+  <div class="logo">📷</div>
+  <h1>CameraCoach</h1>
+  <p>Asystent kompozycji zdjęć działający w przeglądarce — bez instalacji z App Store.</p>
+  <ul>
+    <li><span>⊞</span> Siatka trójpodziału z kropkami przecięcia</li>
+    <li><span>⚖️</span> Poziomica i wskaźnik horyzontu</li>
+    <li><span>☀️</span> Miernik ekspozycji i histogram RGB</li>
+    <li><span>💡</span> Wskazówki kompozycyjne na żywo</li>
+    <li><span>⏱</span> Timer 3s / 10s, zoom, fokus na dotyk</li>
+  </ul>
+  <button id="start-btn" onclick="startCamera()">Uruchom kamerę</button>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="capture-canvas"></canvas>
+
+  <!-- Grid -->
+  <div id="grid-overlay">
+    <div class="gl-h" id="gh1"></div>
+    <div class="gl-h" id="gh2"></div>
+    <div class="gl-v" id="gv1"></div>
+    <div class="gl-v" id="gv2"></div>
+    <div class="grid-dot" style="top:33.33%;left:33.33%"></div>
+    <div class="grid-dot" style="top:33.33%;left:66.66%"></div>
+    <div class="grid-dot" style="top:66.66%;left:33.33%"></div>
+    <div class="grid-dot" style="top:66.66%;left:66.66%"></div>
+  </div>
+
+  <!-- Horizon line -->
+  <div id="horizon-line">
+    <div id="horizon-center"></div>
+  </div>
+
+  <!-- Level bubble -->
+  <div id="level-bubble-wrap">
+    <div id="level-track">
+      <div id="level-bubble"></div>
+    </div>
+    <div id="level-angle">0.0°</div>
+  </div>
+
+  <!-- Exposure meter -->
+  <div id="exp-meter">
+    <div id="exp-bar-bg">
+      <div id="exp-bar-fill"></div>
+    </div>
+    <div id="exp-label">EXP</div>
+    <div id="exp-zone"></div>
+  </div>
+
+  <!-- Histogram -->
+  <div id="histogram">
+    <canvas id="hist-canvas"></canvas>
+  </div>
+
+  <!-- Tip banner -->
+  <div id="tip-banner">
+    <span id="tip-icon"></span><span id="tip-text"></span>
+  </div>
+
+  <!-- Zoom slider -->
+  <div id="zoom-wrap">
+    <span style="font-size:13px;opacity:.6">−</span>
+    <input type="range" id="zoom-slider" min="1" max="5" step="0.05" value="1">
+    <span id="zoom-label">1.0×</span>
+  </div>
+
+  <!-- Focus ring -->
+  <div id="focus-ring"></div>
+
+  <!-- Flash overlay -->
+  <div id="flash"></div>
+
+  <!-- Timer countdown -->
+  <div id="countdown"></div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <!-- TOP BAR -->
+  <div id="top-bar">
+    <div class="ibtn-col">
+      <button class="ibtn" id="btn-flip" onclick="flipCamera()">🔄</button>
+      <span class="ibtn-lbl">Odwróć</span>
+    </div>
+    <div class="ibtn-col">
+      <button class="ibtn" id="btn-tips" onclick="toggleTips()">💡</button>
+      <span class="ibtn-lbl">Wskazówki</span>
+    </div>
+    <div class="ibtn-col">
+      <button class="ibtn" id="btn-hist" onclick="toggleHistogram()">📊</button>
+      <span class="ibtn-lbl">Histogram</span>
+    </div>
+    <div class="ibtn-col">
+      <button class="ibtn" id="btn-zoom" onclick="toggleZoom()">🔍</button>
+      <span class="ibtn-lbl">Zoom</span>
+    </div>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div id="bottom-bar">
+    <div class="ibtn-col">
+      <button class="ibtn" id="btn-grid" onclick="toggleGrid()">⊞</button>
+      <span class="ibtn-lbl">Siatka</span>
+    </div>
+    <div class="ibtn-col">
+      <button class="ibtn" id="btn-level" onclick="toggleLevel()">⚖️</button>
+      <span class="ibtn-lbl">Poziom</span>
+    </div>
+    <button id="capture-btn" onclick="triggerCapture()"></button>
+    <div class="ibtn-col">
+      <button class="ibtn" id="btn-timer" onclick="cycleTimer()">⏱</button>
+      <span class="ibtn-lbl" id="timer-lbl">Brak</span>
+    </div>
+    <div class="ibtn-col">
+      <button class="ibtn" id="btn-exp" onclick="toggleExposure()">☀️</button>
+      <span class="ibtn-lbl">Ekspozycja</span>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────────────────────────
+let stream = null;
+let facingMode = 'environment';
+let analysisTimer = null;
+let timerCountdown = null;
+
+const state = {
+  grid: false,
+  level: false,
+  exposure: false,
+  histogram: false,
+  tips: false,
+  zoom: false,
+  timerIdx: 0,          // 0=off, 1=3s, 2=10s
+  timerRunning: false,
+  orientationOk: false,
+  zoomSupported: false,
+  gamma: 0,
+};
+
+const TIMER_VALUES   = [0, 3, 10];
+const TIMER_LABELS   = ['Brak', '3 s', '10 s'];
+
+// ── DOM refs ───────────────────────────────────────────────────────────────
+const video          = document.getElementById('video');
+const captureCanvas  = document.getElementById('capture-canvas');
+const flashEl        = document.getElementById('flash');
+const countdownEl    = document.getElementById('countdown');
+const toastEl        = document.getElementById('toast');
+const gridOverlay    = document.getElementById('grid-overlay');
+const horizonLine    = document.getElementById('horizon-line');
+const horizonCenter  = document.getElementById('horizon-center');
+const levelWrap      = document.getElementById('level-bubble-wrap');
+const levelBubble    = document.getElementById('level-bubble');
+const levelAngle     = document.getElementById('level-angle');
+const expMeter       = document.getElementById('exp-meter');
+const expFill        = document.getElementById('exp-bar-fill');
+const expZone        = document.getElementById('exp-zone');
+const histogramEl    = document.getElementById('histogram');
+const histCanvas     = document.getElementById('hist-canvas');
+const tipBanner      = document.getElementById('tip-banner');
+const tipIcon        = document.getElementById('tip-icon');
+const tipText        = document.getElementById('tip-text');
+const zoomWrap       = document.getElementById('zoom-wrap');
+const zoomSlider     = document.getElementById('zoom-slider');
+const zoomLabel      = document.getElementById('zoom-label');
+const focusRing      = document.getElementById('focus-ring');
+
+// ── Camera ─────────────────────────────────────────────────────────────────
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false,
+    });
+    video.srcObject = stream;
+    await video.play();
+
+    document.getElementById('perm-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+
+    detectZoomSupport();
+    await requestOrientationPermission();
+    startAnalysisLoop();
+
+    video.addEventListener('click', onTapFocus);
+    requestWakeLock();
+  } catch (err) {
+    alert('Brak dostępu do kamery.\n' + err.message);
+  }
+}
+
+async function flipCamera() {
+  facingMode = facingMode === 'environment' ? 'user' : 'environment';
+  stopStream();
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false,
+    });
+    video.srcObject = stream;
+    await video.play();
+    detectZoomSupport();
+  } catch (err) {
+    showToast('Błąd kamery');
+  }
+}
+
+function stopStream() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+}
+
+// ── Zoom ───────────────────────────────────────────────────────────────────
+function detectZoomSupport() {
+  const track = stream?.getVideoTracks()[0];
+  if (!track?.getCapabilities) return;
+  const caps = track.getCapabilities();
+  if (caps.zoom) {
+    state.zoomSupported = true;
+    zoomSlider.min   = caps.zoom.min;
+    zoomSlider.max   = caps.zoom.max;
+    zoomSlider.step  = (caps.zoom.max - caps.zoom.min) / 60;
+    zoomSlider.value = caps.zoom.min;
+    zoomLabel.textContent = parseFloat(caps.zoom.min).toFixed(1) + '×';
+    document.getElementById('btn-zoom').classList.remove('disabled');
+  } else {
+    state.zoomSupported = false;
+    document.getElementById('btn-zoom').classList.add('disabled');
+  }
+}
+
+zoomSlider.addEventListener('input', () => {
+  const val = parseFloat(zoomSlider.value);
+  zoomLabel.textContent = val.toFixed(1) + '×';
+  const track = stream?.getVideoTracks()[0];
+  if (track?.applyConstraints) {
+    track.applyConstraints({ advanced: [{ zoom: val }] }).catch(() => {});
+  }
+});
+
+// ── Orientation / Level ────────────────────────────────────────────────────
+async function requestOrientationPermission() {
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try {
+      const result = await DeviceOrientationEvent.requestPermission();
+      state.orientationOk = result === 'granted';
+    } catch {
+      state.orientationOk = false;
+    }
+  } else {
+    state.orientationOk = true;
+  }
+  if (state.orientationOk) {
+    window.addEventListener('deviceorientation', onOrientation, { passive: true });
+  }
+}
+
+function onOrientation(e) {
+  state.gamma = e.gamma ?? 0;
+  if (state.level) updateLevelUI();
+}
+
+function updateLevelUI() {
+  const g = state.gamma;
+  const isLevel = Math.abs(g) < 2.5;
+
+  // Bubble position: map ±30° to left 5%–95%
+  const clamped = Math.max(-28, Math.min(28, g));
+  const pct = 50 + (clamped / 28) * 44; // 6% to 94%
+  levelBubble.style.left = pct + '%';
+  levelBubble.classList.toggle('ok', isLevel);
+  levelAngle.textContent = (g >= 0 ? '+' : '') + g.toFixed(1) + '°';
+
+  // Horizon line rotation
+  horizonLine.style.transform = `rotate(${-g * 0.8}deg)`;
+  horizonCenter.classList.toggle('is-level', isLevel);
+}
+
+// ── Tap to focus ───────────────────────────────────────────────────────────
+function onTapFocus(e) {
+  const x = e.clientX, y = e.clientY;
+  focusRing.style.display = 'block';
+  focusRing.style.left = x + 'px';
+  focusRing.style.top  = y + 'px';
+  focusRing.style.animation = 'none';
+  void focusRing.offsetWidth;
+  focusRing.style.animation = 'focus-pop 0.3s ease forwards';
+
+  const rect = video.getBoundingClientRect();
+  const px = (x - rect.left) / rect.width;
+  const py = (y - rect.top)  / rect.height;
+  const track = stream?.getVideoTracks()[0];
+  if (track?.applyConstraints) {
+    track.applyConstraints({
+      advanced: [{ focusMode: 'manual', pointsOfInterest: [{ x: px, y: py }] }],
+    }).then(() => {
+      focusRing.classList.add('focused');
+    }).catch(() => {});
+  }
+
+  clearTimeout(focusRing._timer);
+  focusRing._timer = setTimeout(() => {
+    focusRing.style.display = 'none';
+    focusRing.classList.remove('focused');
+  }, 1800);
+}
+
+// ── Analysis loop ──────────────────────────────────────────────────────────
+function startAnalysisLoop() {
+  if (analysisTimer) clearInterval(analysisTimer);
+  analysisTimer = setInterval(runAnalysis, 480);
+}
+
+function runAnalysis() {
+  if (video.readyState < 2) return;
+  if (!state.exposure && !state.histogram && !state.tips) return;
+
+  const W = 256, H = 144;
+  const off = Object.assign(document.createElement('canvas'), { width: W, height: H });
+  const ctx = off.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(video, 0, 0, W, H);
+
+  let data;
+  try { data = ctx.getImageData(0, 0, W, H).data; } catch { return; }
+
+  let lumSum = 0;
+  const lum = new Uint32Array(256);
+  const rCh  = new Uint32Array(256);
+  const gCh  = new Uint32Array(256);
+  const bCh  = new Uint32Array(256);
+  const n = W * H;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i+1], b = data[i+2];
+    const l = Math.round(0.299*r + 0.587*g + 0.114*b);
+    lumSum += l;
+    lum[l]++; rCh[r]++; gCh[g]++; bCh[b]++;
+  }
+
+  const avgLum = lumSum / n;
+
+  if (state.exposure)   updateExposureUI(avgLum);
+  if (state.histogram)  drawHistogram(lum, rCh, gCh, bCh);
+  if (state.tips)       updateTips(avgLum);
+}
+
+// ── Exposure UI ────────────────────────────────────────────────────────────
+function updateExposureUI(avgLum) {
+  const pct = (avgLum / 255) * 100;
+  expFill.style.height = pct + '%';
+
+  if (avgLum < 55) {
+    expFill.style.backgroundColor = '#5C9BF5';
+    expZone.textContent = 'Ciemno';
+  } else if (avgLum > 205) {
+    expFill.style.backgroundColor = '#F5925C';
+    expZone.textContent = 'Jasno';
+  } else {
+    expFill.style.backgroundColor = '#4CAF50';
+    expZone.textContent = 'OK';
+  }
+}
+
+// ── Histogram ──────────────────────────────────────────────────────────────
+function drawHistogram(lum, rCh, gCh, bCh) {
+  const cW = histogramEl.clientWidth  || 88;
+  const cH = histogramEl.clientHeight || 54;
+  histCanvas.width  = cW;
+  histCanvas.height = cH;
+  const ctx = histCanvas.getContext('2d');
+  ctx.clearRect(0, 0, cW, cH);
+
+  let maxVal = 0;
+  for (let i = 0; i < 256; i++) maxVal = Math.max(maxVal, lum[i], rCh[i], gCh[i], bCh[i]);
+  if (maxVal === 0) return;
+
+  const channels = [
+    { data: rCh, color: 'rgba(255,70,70,0.55)' },
+    { data: gCh, color: 'rgba(70,220,70,0.55)' },
+    { data: bCh, color: 'rgba(70,100,255,0.55)' },
+  ];
+
+  for (const ch of channels) {
+    ctx.beginPath();
+    ctx.fillStyle = ch.color;
+    ctx.moveTo(0, cH);
+    for (let i = 0; i < 256; i++) {
+      ctx.lineTo((i / 255) * cW, cH - (ch.data[i] / maxVal) * cH);
+    }
+    ctx.lineTo(cW, cH);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 256; i++) {
+    const x = (i / 255) * cW;
+    const y = cH - (lum[i] / maxVal) * cH;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+// ── Tips ───────────────────────────────────────────────────────────────────
+const ROTATING_TIPS = [
+  { icon: '📐', text: 'Trójpodział: umieść obiekt na jednym z 4 punktów przecięcia siatki, nie na środku.' },
+  { icon: '👁️', text: 'Dotknij ekranu w miejscu, na które chcesz nastawić ostrość.' },
+  { icon: '🌅', text: 'Horyzont: trzymaj go na górnej lub dolnej linii siatki — nigdy na środku.' },
+  { icon: '📏', text: 'Linie prowadzące (droga, płot, rzeka) przyciągają wzrok w głąb kadru.' },
+  { icon: '🌳', text: 'Reguła przestrzeni: zostaw miejsce po stronie, w którą obiekt "patrzy" lub porusza się.' },
+  { icon: '🖼️', text: 'Rama w ramie: użyj łuku, okna lub gałęzi by otoczyć główny motyw.' },
+];
+let tipRotateIdx = 0;
+
+function updateTips(avgLum) {
+  let icon = '', text = '';
+
+  // Priority: level → exposure → rotating educational tips
+  if (state.orientationOk && Math.abs(state.gamma) > 7) {
+    const dir = state.gamma > 0 ? 'lewo' : 'prawo';
+    icon = '📐';
+    text = `Przechyl telefon o ${Math.abs(state.gamma).toFixed(0)}° w ${dir} — zdjęcie jest krzywe.`;
+  } else if (avgLum < 50) {
+    icon = '🌑';
+    text = 'Za ciemno — poszukaj lepszego oświetlenia lub podejdź bliżej okna.';
+  } else if (avgLum > 210) {
+    icon = '🌞';
+    text = 'Prześwietlone — obróć się tak, by źródło światła było za Tobą, nie przed obiektywem.';
+  } else {
+    const tip = ROTATING_TIPS[tipRotateIdx % ROTATING_TIPS.length];
+    icon = tip.icon;
+    text = tip.text;
+    // rotate every ~8 seconds (analysisLoop runs ~2/s, so every 16 calls)
+    if (++tipRotateIdx >= ROTATING_TIPS.length * 16) tipRotateIdx = 0;
+  }
+
+  tipIcon.textContent = icon;
+  tipText.textContent = text;
+}
+
+// ── Capture ────────────────────────────────────────────────────────────────
+function triggerCapture() {
+  if (state.timerRunning) return;
+  const delay = TIMER_VALUES[state.timerIdx];
+  if (delay === 0) { doCapture(); return; }
+
+  state.timerRunning = true;
+  let left = delay;
+  countdownEl.textContent = left;
+  countdownEl.style.display = 'block';
+  document.getElementById('capture-btn').classList.add('recording');
+
+  timerCountdown = setInterval(() => {
+    left--;
+    if (left <= 0) {
+      clearInterval(timerCountdown);
+      countdownEl.style.display = 'none';
+      document.getElementById('capture-btn').classList.remove('recording');
+      state.timerRunning = false;
+      doCapture();
+    } else {
+      countdownEl.textContent = left;
+    }
+  }, 1000);
+}
+
+function doCapture() {
+  // Flash effect
+  flashEl.style.transition = 'none';
+  flashEl.style.opacity = '1';
+  requestAnimationFrame(() => {
+    flashEl.style.transition = 'opacity 0.45s ease';
+    flashEl.style.opacity = '0';
+  });
+
+  captureCanvas.width  = video.videoWidth;
+  captureCanvas.height = video.videoHeight;
+  const ctx = captureCanvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+
+  captureCanvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), {
+      href: url,
+      download: `foto_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`,
+    });
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('📷 Zdjęcie zapisane');
+  }, 'image/jpeg', 0.94);
+}
+
+// ── Toggle helpers ─────────────────────────────────────────────────────────
+function setVisible(el, key, btnId) {
+  state[key] = !state[key];
+  el.style.display = state[key] ? (el.dataset.flex ? 'flex' : 'block') : 'none';
+  document.getElementById(btnId).classList.toggle('on', state[key]);
+}
+
+function toggleGrid()      { setVisible(gridOverlay, 'grid', 'btn-grid'); }
+function toggleHistogram() { setVisible(histogramEl, 'histogram', 'btn-hist'); }
+function toggleTips()      { setVisible(tipBanner, 'tips', 'btn-tips'); }
+
+function toggleExposure() {
+  state.exposure = !state.exposure;
+  expMeter.style.display = state.exposure ? 'flex' : 'none';
+  document.getElementById('btn-exp').classList.toggle('on', state.exposure);
+}
+
+function toggleLevel() {
+  state.level = !state.level;
+  levelWrap.style.display   = state.level ? 'flex' : 'none';
+  horizonLine.style.display = state.level ? 'block' : 'none';
+  document.getElementById('btn-level').classList.toggle('on', state.level);
+
+  if (state.level && !state.orientationOk) {
+    requestOrientationPermission().then(() => {
+      if (!state.orientationOk) showToast('Brak dostępu do żyroskopu');
+    });
+  }
+}
+
+function toggleZoom() {
+  if (!state.zoomSupported) { showToast('Zoom niedostępny na tym urządzeniu'); return; }
+  state.zoom = !state.zoom;
+  zoomWrap.style.display = state.zoom ? 'flex' : 'none';
+  document.getElementById('btn-zoom').classList.toggle('on', state.zoom);
+}
+
+function cycleTimer() {
+  state.timerIdx = (state.timerIdx + 1) % TIMER_VALUES.length;
+  document.getElementById('timer-lbl').textContent = TIMER_LABELS[state.timerIdx];
+  document.getElementById('btn-timer').classList.toggle('on', state.timerIdx > 0);
+  showToast('Timer: ' + TIMER_LABELS[state.timerIdx]);
+}
+
+// Mark flex containers so setVisible knows display type
+zoomWrap.dataset.flex  = '1';
+expMeter.dataset.flex  = '1';
+levelWrap.dataset.flex = '1';
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.style.opacity = '0', 2200);
+}
+
+// ── Wake lock ──────────────────────────────────────────────────────────────
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try { await navigator.wakeLock.request('screen'); } catch {}
+  }
+}
+
+// ── Service Worker ─────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
